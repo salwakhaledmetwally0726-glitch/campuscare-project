@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
+
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
   ActivityIndicator,
   Alert,
 } from "react-native";
@@ -32,15 +33,9 @@ export default function MyIssuesScreen({ navigation }) {
         },
       });
 
-      console.log(response.data);
-
       setIssues(response.data.issues || []);
     } catch (error) {
-      console.log(
-        "Fetch Issues Error:",
-        error.response?.data || error.message
-      );
-
+      console.log("My issues error:", error.response?.data || error.message);
       Alert.alert("Error", "Could not load issues.");
     } finally {
       setLoading(false);
@@ -55,7 +50,7 @@ export default function MyIssuesScreen({ navigation }) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text style={{ marginTop: 10 }}>Loading Issues...</Text>
+        <Text style={styles.loadingText}>Loading issues...</Text>
       </View>
     );
   }
@@ -71,46 +66,33 @@ export default function MyIssuesScreen({ navigation }) {
           data={issues}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate("IssueDetails", { issue: item })
+              }
+            >
               <Text style={styles.issueTitle}>{item.title}</Text>
 
-              <Text style={styles.text}>
-                Category: {item.category}
-              </Text>
+              <Text style={styles.text}>Category: {item.category}</Text>
+              <Text style={styles.text}>Building: {item.building}</Text>
+              <Text style={styles.text}>Floor: {item.floor}</Text>
+              <Text style={styles.text}>Room: {item.room}</Text>
+              <Text style={styles.text}>Description: {item.description}</Text>
 
-              <Text style={styles.text}>
-                Building: {item.building}
-              </Text>
+              <Text style={styles.status}>Status: {item.status}</Text>
 
-              <Text style={styles.text}>
-                Floor: {item.floor}
-              </Text>
-
-              <Text style={styles.text}>
-                Room: {item.room}
-              </Text>
-
-              <Text style={styles.text}>
-                Description: {item.description}
-              </Text>
-
-              <Text style={styles.status}>
-                Status: {item.status}
-              </Text>
-            </View>
+              <Text style={styles.tapText}>Tap to view details</Text>
+            </TouchableOpacity>
           )}
         />
       )}
 
       <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          navigation.navigate("CommunityDashboard")
-        }
+        style={styles.backButton}
+        onPress={() => navigation.navigate("CommunityDashboard")}
       >
-        <Text style={styles.buttonText}>
-          Back To Dashboard
-        </Text>
+        <Text style={styles.backButtonText}>Back To Dashboard</Text>
       </TouchableOpacity>
     </View>
   );
@@ -127,10 +109,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#ffffff",
+  },
+
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#555555",
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 20,
@@ -140,7 +129,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
     fontSize: 18,
-    color: "#666",
+    color: "#666666",
   },
 
   card: {
@@ -161,24 +150,30 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 15,
     marginBottom: 4,
-    color: "#444",
+    color: "#444444",
   },
 
   status: {
     marginTop: 10,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
     color: "#007bff",
   },
 
-  button: {
+  tapText: {
+    marginTop: 10,
+    color: "#777777",
+    fontStyle: "italic",
+  },
+
+  backButton: {
     backgroundColor: "#007bff",
     padding: 15,
     borderRadius: 10,
     marginTop: 10,
   },
 
-  buttonText: {
+  backButtonText: {
     color: "#ffffff",
     textAlign: "center",
     fontWeight: "bold",

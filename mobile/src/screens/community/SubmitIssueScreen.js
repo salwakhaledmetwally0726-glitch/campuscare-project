@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+
 import {
   ScrollView,
   Text,
@@ -7,8 +8,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 
+import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../../api/api";
 
@@ -19,7 +22,31 @@ export default function SubmitIssueScreen({ navigation }) {
   const [floor, setFloor] = useState("");
   const [room, setRoom] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUri, setImageUri] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const pickImage = async () => {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permission.status !== "granted") {
+      Alert.alert(
+        "Permission Required",
+        "Please allow photo access to attach an image."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
 
   const handleSubmitIssue = async () => {
     if (!title || !category || !building || !floor || !room || !description) {
@@ -47,7 +74,7 @@ export default function SubmitIssueScreen({ navigation }) {
           building,
           floor,
           room,
-          photo_url: "test.jpg",
+          photo_url: imageUri || "test.jpg",
         },
         {
           headers: {
@@ -56,7 +83,10 @@ export default function SubmitIssueScreen({ navigation }) {
         }
       );
 
-      Alert.alert("Success", response.data.message || "Issue submitted successfully");
+      Alert.alert(
+        "Success",
+        response.data.message || "Issue submitted successfully"
+      );
 
       setTitle("");
       setCategory("");
@@ -64,10 +94,14 @@ export default function SubmitIssueScreen({ navigation }) {
       setFloor("");
       setRoom("");
       setDescription("");
+      setImageUri(null);
 
       navigation.navigate("MyIssues");
     } catch (error) {
-      console.log("Submit issue error:", error.response?.data || error.message);
+      console.log(
+        "Submit issue error:",
+        error.response?.data || error.message
+      );
 
       Alert.alert(
         "Submit Failed",
@@ -125,6 +159,18 @@ export default function SubmitIssueScreen({ navigation }) {
         multiline={true}
       />
 
+      <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
+        <Text style={styles.imageButtonText}>
+          Choose Issue Photo
+        </Text>
+      </TouchableOpacity>
+
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={styles.previewImage} />
+      ) : (
+        <Text style={styles.noImageText}>No image selected</Text>
+      )}
+
       <TouchableOpacity
         style={styles.button}
         onPress={handleSubmitIssue}
@@ -151,12 +197,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#ffffff",
   },
+
   title: {
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 25,
   },
+
   input: {
     borderWidth: 1,
     borderColor: "#cccccc",
@@ -165,6 +213,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontSize: 16,
   },
+
   textArea: {
     borderWidth: 1,
     borderColor: "#cccccc",
@@ -175,18 +224,47 @@ const styles = StyleSheet.create({
     height: 110,
     textAlignVertical: "top",
   },
+
+  imageButton: {
+    backgroundColor: "#222222",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+
+  imageButtonText: {
+    color: "#ffffff",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+
+  previewImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+
+  noImageText: {
+    textAlign: "center",
+    color: "#777777",
+    marginBottom: 15,
+  },
+
   button: {
     backgroundColor: "#007bff",
     padding: 15,
     borderRadius: 10,
     marginTop: 8,
   },
+
   buttonText: {
     color: "#ffffff",
     textAlign: "center",
     fontWeight: "bold",
     fontSize: 17,
   },
+
   back: {
     marginTop: 20,
     textAlign: "center",
