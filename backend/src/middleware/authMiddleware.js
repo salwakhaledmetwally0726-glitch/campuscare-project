@@ -13,7 +13,6 @@ const authenticateUser = (req, res, next) => {
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
-
     const decoded = jwt.verify(token, JWT_SECRET);
 
     req.user = decoded;
@@ -26,4 +25,19 @@ const authenticateUser = (req, res, next) => {
   }
 };
 
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: "Access denied. Your role is not allowed to perform this action.",
+        requiredRoles: allowedRoles,
+        yourRole: req.user?.role,
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = authenticateUser;
+module.exports.authorizeRoles = authorizeRoles;

@@ -1,216 +1,384 @@
 import React, { useEffect, useState } from "react";
 import {
-  View,
   Text,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
+  Image,
+  View,
 } from "react-native";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../../api/api";
 
 export default function ManagerDashboard({ navigation }) {
   const [issues, setIssues] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [workers, setWorkers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [expandedIssues, setExpandedIssues] = useState({});
 
-  const fetchAllIssues = async () => {
+  const getToken = async () => {
+    const token = await AsyncStorage.getItem("token");
+
+    if (!token) {
+      Alert.alert("Session Expired", "Please login again.");
+      navigation.navigate("Login");
+      return null;
+    }
+
+    return token;
+  };
+
+  const refreshAll = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      setLoading(true);
 
-      if (!token) {
-        Alert.alert("Not Logged In", "Please login again.");
-        navigation.navigate("Login");
-        return;
-      }
+      const token = await getToken();
+      if (!token) return;
 
-      const response = await API.get("/issues", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const issuesRes = await API.get("/issues", {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      setIssues(response.data.issues || []);
+      const workersRes = await API.get("/issues/workers", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setIssues(issuesRes.data.issues || []);
+      setWorkers(workersRes.data.workers || []);
     } catch (error) {
-      Alert.alert("Error", "Could not load all issues.");
+      Alert.alert("Error", "Failed to refresh issues and workers.");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (issueId, newStatus) => {
+  const toggleDetails = (issueId) => {
+    setExpandedIssues({
+      ...expandedIssues,
+      [issueId]: !expandedIssues[issueId],
+    });
+  };
+
+  const updateStatus = async (issueId, status) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
+      if (!token) return;
 
       await API.put(
         `/issues/${issueId}/status`,
-        { status: newStatus },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      Alert.alert("Success", `Issue status updated to ${newStatus}`);
-      fetchAllIssues();
+      Alert.alert("Success", `Status updated to ${status}`);
+      refreshAll();
     } catch (error) {
-      Alert.alert("Error", "Could not update issue status.");
+      Alert.alert("Error", error.response?.data?.error || "Failed to update status");
     }
   };
 
+  const assignWorker = async (issueId, worker) => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      await API.put(
+        `/issues/${issueId}/assign`,
+        { worker_id: worker.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      Alert.alert("Success", `Assigned to ${worker.name || worker.email}`);
+      refreshAll();
+    } catch (error) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to assign worker");
+    }
+  };
+
+  const logout = async () => {
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+    navigation.navigate("Login");
+  };
+
   useEffect(() => {
-    fetchAllIssues();
+    refreshAll();
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>Loading all issues...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Manager Dashboard</Text>
       <Text style={styles.subtitle}>All Reported Issues</Text>
 
-      <TouchableOpacity
-        style={styles.profileButton}
-        onPress={() => navigation.navigate("Profile")}
-      >
-        <Text style={styles.profileButtonText}>Profile</Text>
+      <TouchableOpacity style={styles.refreshBtn} onPress={refreshAll}>
+        <Text style={styles.btnText}>Refresh Issues & Workers</Text>
       </TouchableOpacity>
 
-      <FlatList
-        data={issues}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.issueTitle}>{item.title}</Text>
-
-            <Text style={styles.text}>Category: {item.category}</Text>
-            <Text style={styles.text}>Building: {item.building}</Text>
-            <Text style={styles.text}>Floor: {item.floor}</Text>
-            <Text style={styles.text}>Room: {item.room}</Text>
-            <Text style={styles.text}>Description: {item.description}</Text>
-
-            <Text style={styles.status}>Current Status: {item.status}</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#0F172A" />
+      ) : issues.length === 0 ? (
+        <Text style={styles.emptyText}>No issues found.</Text>
+      ) : (
+        issues.map((issue) => (
+          <View key={issue.id} style={styles.card}>
+            <Text style={styles.issueTitle}>{issue.title}</Text>
+            <Text style={styles.text}>Category: {issue.category}</Text>
+            <Text style={styles.status}>Status: {issue.status || "Pending"}</Text>
 
             <TouchableOpacity
-              style={styles.progressButton}
-              onPress={() => updateStatus(item.id, "In Progress")}
+              style={styles.detailsBtn}
+              onPress={() => toggleDetails(issue.id)}
             >
-              <Text style={styles.buttonText}>In Progress</Text>
+              <Text style={styles.btnText}>
+                {expandedIssues[issue.id] ? "Hide Full Details" : "View Full Details"}
+              </Text>
+            </TouchableOpacity>
+
+            {expandedIssues[issue.id] && (
+              <View style={styles.detailsBox}>
+                <Text style={styles.detailsTitle}>Issue Full Details</Text>
+
+                <Text style={styles.detailText}>Issue ID: {issue.id}</Text>
+                <Text style={styles.detailText}>Title: {issue.title}</Text>
+                <Text style={styles.detailText}>Category: {issue.category}</Text>
+                <Text style={styles.detailText}>Description: {issue.description}</Text>
+                <Text style={styles.detailText}>Building: {issue.building}</Text>
+                <Text style={styles.detailText}>Floor: {issue.floor}</Text>
+                <Text style={styles.detailText}>Room: {issue.room}</Text>
+                <Text style={styles.detailText}>Status: {issue.status}</Text>
+                <Text style={styles.detailText}>Created By: {issue.created_by}</Text>
+                <Text style={styles.detailText}>
+                  Assigned To: {issue.assigned_to || "Not assigned"}
+                </Text>
+                <Text style={styles.detailText}>
+                  Worker Comment: {issue.worker_comment || "No comment yet"}
+                </Text>
+                <Text style={styles.detailText}>
+                  Created At: {issue.created_at || "N/A"}
+                </Text>
+
+                {issue.photo_url ? (
+                  <>
+                    <Text style={styles.imageLabel}>Issue Photo:</Text>
+                    <Image source={{ uri: issue.photo_url }} style={styles.issueImage} />
+                  </>
+                ) : (
+                  <Text style={styles.noImage}>No issue photo available</Text>
+                )}
+
+                {issue.completion_photo_url ? (
+                  <>
+                    <Text style={styles.imageLabel}>Completion Photo:</Text>
+                    <Image
+                      source={{ uri: issue.completion_photo_url }}
+                      style={styles.issueImage}
+                    />
+                  </>
+                ) : (
+                  <Text style={styles.noImage}>No completion photo yet</Text>
+                )}
+              </View>
+            )}
+
+            <Text style={styles.section}>Update Status</Text>
+
+            <TouchableOpacity
+              style={[styles.statusBtn, styles.blue]}
+              onPress={() => updateStatus(issue.id, "In Progress")}
+            >
+              <Text style={styles.btnText}>In Progress</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.resolvedButton}
-              onPress={() => updateStatus(item.id, "Resolved")}
+              style={[styles.statusBtn, styles.green]}
+              onPress={() => updateStatus(issue.id, "Resolved")}
             >
-              <Text style={styles.buttonText}>Resolved</Text>
+              <Text style={styles.btnText}>Resolved</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.closedButton}
-              onPress={() => updateStatus(item.id, "Closed")}
+              style={[styles.statusBtn, styles.red]}
+              onPress={() => updateStatus(issue.id, "Closed")}
             >
-              <Text style={styles.buttonText}>Closed</Text>
+              <Text style={styles.btnText}>Closed</Text>
             </TouchableOpacity>
+
+            <Text style={styles.section}>Assign to Worker</Text>
+
+            {workers.length === 0 ? (
+              <Text style={styles.noWorker}>No workers found</Text>
+            ) : (
+              workers.map((worker) => (
+                <TouchableOpacity
+                  key={worker.id}
+                  style={styles.workerBtn}
+                  onPress={() => assignWorker(issue.id, worker)}
+                >
+                  <Text style={styles.workerText}>
+                    {worker.name || "Worker"} - {worker.email}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+
+            <Text style={styles.assigned}>
+              Assigned: {issue.assigned_to ? issue.assigned_to : "Not assigned"}
+            </Text>
           </View>
-        )}
-      />
-    </View>
+        ))
+      )}
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+        <Text style={styles.btnText}>Logout</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: "#ffffff",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-  },
-  loadingText: {
-    marginTop: 10,
-    color: "#555555",
-  },
+  container: { padding: 22, backgroundColor: "#F8FAFC" },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "bold",
     textAlign: "center",
+    marginTop: 20,
+    color: "#0F172A",
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: "center",
-    color: "#666666",
+    color: "#64748B",
     marginBottom: 15,
   },
-  profileButton: {
-    backgroundColor: "#222222",
+  refreshBtn: {
+    backgroundColor: "#0F172A",
     padding: 14,
     borderRadius: 10,
-    marginBottom: 15,
+    marginBottom: 18,
   },
-  profileButtonText: {
-    color: "#ffffff",
+  emptyText: {
     textAlign: "center",
-    fontWeight: "bold",
+    fontSize: 18,
+    color: "#64748B",
+    marginTop: 30,
   },
   card: {
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#FFFFFF",
+    padding: 18,
+    borderRadius: 14,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: "#dddddd",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
+    borderColor: "#E2E8F0",
   },
   issueTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 8,
+    color: "#0F172A",
   },
   text: {
-    fontSize: 15,
+    fontSize: 16,
+    color: "#334155",
     marginBottom: 4,
-    color: "#444444",
   },
   status: {
-    marginTop: 10,
-    marginBottom: 12,
-    fontSize: 16,
+    fontSize: 18,
+    color: "#1D4ED8",
     fontWeight: "bold",
-    color: "#007bff",
+    marginVertical: 10,
   },
-  progressButton: {
-    backgroundColor: "#f0ad4e",
-    padding: 12,
-    borderRadius: 8,
+  section: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginTop: 12,
+    marginBottom: 8,
+    color: "#0F172A",
+  },
+  statusBtn: {
+    padding: 13,
+    borderRadius: 10,
     marginBottom: 8,
   },
-  resolvedButton: {
-    backgroundColor: "#28a745",
-    padding: 12,
+  blue: { backgroundColor: "#2563EB" },
+  green: { backgroundColor: "#059669" },
+  red: { backgroundColor: "#DC2626" },
+  workerBtn: {
+    backgroundColor: "#334155",
+    padding: 10,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 7,
   },
-  closedButton: {
-    backgroundColor: "#dc3545",
-    padding: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: "#ffffff",
+  workerText: {
+    color: "#FFFFFF",
     textAlign: "center",
     fontWeight: "bold",
+    fontSize: 13,
+  },
+  assigned: {
+    color: "#047857",
+    fontWeight: "bold",
+    marginTop: 8,
+    fontSize: 13,
+  },
+  noWorker: {
+    color: "#DC2626",
+    marginBottom: 8,
+  },
+  logoutBtn: {
+    backgroundColor: "#020617",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 30,
+  },
+  btnText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  detailsBtn: {
+    backgroundColor: "#475569",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  detailsBox: {
+    backgroundColor: "#F1F5F9",
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    marginBottom: 10,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#0F172A",
+  },
+  detailText: {
+    fontSize: 14,
+    color: "#334155",
+    marginBottom: 4,
+  },
+  imageLabel: {
+    fontSize: 15,
+    fontWeight: "bold",
+    marginTop: 10,
+    marginBottom: 6,
+    color: "#0F172A",
+  },
+  issueImage: {
+    width: "100%",
+    height: 170,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  noImage: {
+    color: "#64748B",
+    fontStyle: "italic",
+    marginTop: 8,
   },
 });
