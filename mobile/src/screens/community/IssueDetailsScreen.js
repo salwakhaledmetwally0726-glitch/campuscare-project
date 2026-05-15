@@ -1,241 +1,248 @@
 import React, { useEffect, useState } from "react";
 import {
+  View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
-  TextInput,
   Alert,
-  View,
+  Image,
+  ActivityIndicator,
 } from "react-native";
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../../api/api";
 
 export default function IssueDetailsScreen({ route, navigation }) {
-  const { issue } = route.params;
+  const issueId = route?.params?.issueId || route?.params?.issue?.id;
+  const passedIssue = route?.params?.issue || null;
 
-  const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState([]);
+  const [issue, setIssue] = useState(passedIssue);
+  const [loading, setLoading] = useState(false);
 
-  const fetchComments = async () => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-
-      const response = await API.get(`/comments/${issue.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setComments(response.data.comments || []);
-    } catch (error) {
-      console.log("Fetch comments error:", error.response?.data || error.message);
-    }
-  };
-
-  const addComment = async () => {
-    if (!commentText.trim()) {
-      Alert.alert("Missing Comment", "Please write a comment first.");
+  const loadIssueDetails = async () => {
+    if (!issueId) {
+      Alert.alert("Error", "Issue ID is missing.");
       return;
     }
 
     try {
-      const token = await AsyncStorage.getItem("token");
-
-      await API.post(
-        "/comments",
-        {
-          issue_id: issue.id,
-          comment_text: commentText,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      Alert.alert("Success", "Comment added successfully");
-
-      setCommentText("");
-      fetchComments();
+      setLoading(true);
+      const response = await API.get(`/issues/${issueId}`);
+      setIssue(response.data.issue);
     } catch (error) {
-      console.log("Add comment error:", error.response?.data || error.message);
-      Alert.alert("Error", "Could not add comment.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to load issue details"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchComments();
+    loadIssueDetails();
   }, []);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Issue Details</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.logoText}>
+          GIU <Text style={styles.redText}>Campus</Text>
+          <Text style={styles.goldText}>Care</Text>
+        </Text>
+        <Text style={styles.subtitle}>Issue Details</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.issueTitle}>{issue.title}</Text>
-
-        {issue.photo_url && issue.photo_url !== "test.jpg" ? (
-          <Image source={{ uri: issue.photo_url }} style={styles.image} />
-        ) : null}
-
-        <Text style={styles.text}>Category: {issue.category}</Text>
-        <Text style={styles.text}>Building: {issue.building}</Text>
-        <Text style={styles.text}>Floor: {issue.floor}</Text>
-        <Text style={styles.text}>Room: {issue.room}</Text>
-        <Text style={styles.text}>Description: {issue.description}</Text>
-
-        <Text style={styles.status}>Current Status: {issue.status}</Text>
+        <View style={styles.flagLine}>
+          <View style={styles.blackLine} />
+          <View style={styles.redLine} />
+          <View style={styles.goldLine} />
+        </View>
       </View>
 
-      <View style={styles.commentBox}>
-        <Text style={styles.sectionTitle}>Add Comment</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#D72638" />
+      ) : issue ? (
+        <View style={styles.card}>
+          <Text style={styles.issueTitle}>{issue.title}</Text>
 
-        <TextInput
-          style={styles.commentInput}
-          placeholder="Write update/comment..."
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline={true}
-        />
+          <Text style={styles.statusText}>Status: {issue.status || "Pending"}</Text>
 
-        <TouchableOpacity style={styles.commentButton} onPress={addComment}>
-          <Text style={styles.commentButtonText}>Submit Comment</Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.sectionTitle}>Issue Information</Text>
+          <Text style={styles.text}>Category: {issue.category || "N/A"}</Text>
+          <Text style={styles.text}>Description: {issue.description || "N/A"}</Text>
 
-      <View style={styles.commentsList}>
-        <Text style={styles.sectionTitle}>Comments</Text>
+          <Text style={styles.sectionTitle}>Location</Text>
+          <Text style={styles.text}>Building: {issue.building || "N/A"}</Text>
+          <Text style={styles.text}>Floor: {issue.floor || "N/A"}</Text>
+          <Text style={styles.text}>Room: {issue.room || "N/A"}</Text>
 
-        {comments.length === 0 ? (
-          <Text style={styles.noComments}>No comments yet.</Text>
-        ) : (
-          comments.map((comment) => (
-            <View key={comment.id} style={styles.commentCard}>
-              <Text style={styles.commentText}>{comment.comment_text}</Text>
-              <Text style={styles.commentDate}>
-                {new Date(comment.created_at).toLocaleString()}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
+          <Text style={styles.sectionTitle}>Assignment</Text>
+          <Text style={styles.text}>
+            Assigned To: {issue.assigned_to || "Not assigned yet"}
+          </Text>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
-        <Text style={styles.buttonText}>Back</Text>
-      </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Worker Update</Text>
+          <Text style={styles.text}>
+            Worker Comment: {issue.worker_comment || "No worker comment yet"}
+          </Text>
+
+          {issue.photo_url ? (
+            <>
+              <Text style={styles.sectionTitle}>Issue Photo</Text>
+              <Image source={{ uri: issue.photo_url }} style={styles.image} />
+            </>
+          ) : (
+            <Text style={styles.noImage}>No issue photo available</Text>
+          )}
+
+          {issue.completion_photo_url ? (
+            <>
+              <Text style={styles.sectionTitle}>Completion Photo</Text>
+              <Image
+                source={{ uri: issue.completion_photo_url }}
+                style={styles.image}
+              />
+            </>
+          ) : (
+            <Text style={styles.noImage}>No completion photo uploaded yet</Text>
+          )}
+
+          <TouchableOpacity style={styles.redButton} onPress={loadIssueDetails}>
+            <Text style={styles.buttonText}>Refresh Details</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.blackButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.buttonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.issueTitle}>Issue not found</Text>
+          <TouchableOpacity
+            style={styles.blackButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.buttonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={{ height: 35 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: "#fff",
-    flexGrow: 1,
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+    padding: 18,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
+  header: {
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 24,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#111111",
+  },
+  redText: {
+    color: "#D72638",
+  },
+  goldText: {
+    color: "#F4B400",
+  },
+  subtitle: {
+    fontSize: 17,
+    color: "#555555",
+    marginTop: 6,
+  },
+  flagLine: {
+    flexDirection: "row",
+    width: 190,
+    height: 5,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginTop: 14,
+  },
+  blackLine: {
+    flex: 1,
+    backgroundColor: "#111111",
+  },
+  redLine: {
+    flex: 1,
+    backgroundColor: "#D72638",
+  },
+  goldLine: {
+    flex: 1,
+    backgroundColor: "#F4B400",
   },
   card: {
-    backgroundColor: "#f9f9f9",
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 22,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#E5E5E5",
   },
   issueTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 15,
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#111111",
+    marginBottom: 10,
+  },
+  statusText: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#D72638",
+    marginVertical: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#111111",
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  text: {
+    fontSize: 16,
+    color: "#444444",
+    marginBottom: 6,
   },
   image: {
     width: "100%",
-    height: 180,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-  text: {
-    fontSize: 17,
+    height: 200,
+    borderRadius: 14,
+    marginTop: 8,
     marginBottom: 10,
-    color: "#444",
   },
-  status: {
-    fontSize: 19,
-    fontWeight: "bold",
-    color: "#007bff",
+  noImage: {
+    color: "#777777",
+    fontSize: 15,
+    fontStyle: "italic",
+    marginTop: 14,
+  },
+  redButton: {
+    backgroundColor: "#D72638",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 18,
+  },
+  blackButton: {
+    backgroundColor: "#111111",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
     marginTop: 12,
   },
-  commentBox: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 18,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  commentInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    padding: 12,
-    height: 90,
-    textAlignVertical: "top",
-    marginBottom: 12,
-  },
-  commentButton: {
-    backgroundColor: "#007bff",
-    padding: 14,
-    borderRadius: 10,
-  },
-  commentButtonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "bold",
-  },
-  commentsList: {
-    marginBottom: 18,
-  },
-  noComments: {
-    color: "#777",
-    fontSize: 16,
-  },
-  commentCard: {
-    backgroundColor: "#f1f1f1",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  commentText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  commentDate: {
-    fontSize: 12,
-    color: "#777",
-    marginTop: 6,
-  },
-  button: {
-    backgroundColor: "#1f1f1f",
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
   buttonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "bold",
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "800",
   },
 });

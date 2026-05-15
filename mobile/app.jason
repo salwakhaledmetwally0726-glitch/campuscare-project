@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "GIU CampusCare",
+    "slug": "giu-campuscare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/giu-campuscare-logo.png",
+
+    "userInterfaceStyle": "light",
+
+    "splash": {
+      "image": "./assets/giu-campuscare-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+
+    "ios": {
+      "supportsTablet": true
+    },
+
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/giu-campuscare-logo.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.giu.campuscare"
+    },
+
+    "web": {
+      "favicon": "./assets/giu-campuscare-logo.png"
+    }
+  }
+}

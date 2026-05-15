@@ -1,13 +1,12 @@
 import React, { useState } from "react";
-
 import {
   View,
   Text,
   TextInput,
-  Pressable,
+  TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -16,35 +15,11 @@ import API from "../../api/api";
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
-
-  const goToDashboardByRole = (role) => {
-    if (role === "manager") {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "ManagerDashboard" }],
-      });
-    } else if (role === "worker") {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "WorkerDashboard" }],
-      });
-    } else {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "CommunityDashboard" }],
-      });
-    }
-  };
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert(
-        "Login Failed",
-        "Email and password are required"
-      );
-
+      Alert.alert("Missing Fields", "Please enter email and password");
       return;
     }
 
@@ -64,17 +39,19 @@ export default function LoginScreen({ navigation }) {
 
       Alert.alert("Success", "Login successful");
 
-      goToDashboardByRole(user?.role);
+      if (user.role === "community") {
+        navigation.replace("CommunityDashboard");
+      } else if (user.role === "manager") {
+        navigation.replace("ManagerDashboard");
+      } else if (user.role === "worker") {
+        navigation.replace("WorkerDashboard");
+      } else {
+        Alert.alert("Error", "Unknown user role");
+      }
     } catch (error) {
-      console.log(
-        "Login error:",
-        error.response?.data || error.message
-      );
-
       Alert.alert(
         "Login Failed",
-        error.response?.data?.message ||
-          "Invalid email or password"
+        error.response?.data?.error || "Invalid email or password"
       );
     } finally {
       setLoading(false);
@@ -82,95 +59,170 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
-        CampusCare Login
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry={true}
-      />
-
-      <Pressable
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            Login
-          </Text>
-        )}
-      </Pressable>
-
-      <Pressable
-        onPress={() => navigation.navigate("Register")}
-      >
-        <Text style={styles.link}>
-          Create new account
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.logoContainer}>
+        <Text style={styles.logoText}>
+          GIU <Text style={styles.redText}>Campus</Text>
+          <Text style={styles.goldText}>Care</Text>
         </Text>
-      </Pressable>
-    </View>
+
+        <Text style={styles.subtitle}>
+          Smart Campus Maintenance System
+        </Text>
+
+        <View style={styles.flagLine}>
+          <View style={styles.blackLine} />
+          <View style={styles.redLine} />
+          <View style={styles.goldLine} />
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.title}>Welcome Back</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your email"
+          placeholderTextColor="#999999"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your password"
+          placeholderTextColor="#999999"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Logging In..." : "Login"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.registerButton}
+          onPress={() => navigation.navigate("Register")}
+        >
+          <Text style={styles.buttonText}>Create New Account</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 25,
+    flexGrow: 1,
+    backgroundColor: "#F8F9FA",
     justifyContent: "center",
-    backgroundColor: "#ffffff",
+    padding: 24,
+  },
+
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+
+  logoText: {
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#111111",
+  },
+
+  redText: {
+    color: "#D72638",
+  },
+
+  goldText: {
+    color: "#F4B400",
+  },
+
+  subtitle: {
+    fontSize: 17,
+    color: "#666666",
+    marginTop: 10,
+    textAlign: "center",
+  },
+
+  flagLine: {
+    flexDirection: "row",
+    width: 220,
+    height: 6,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginTop: 18,
+  },
+
+  blackLine: {
+    flex: 1,
+    backgroundColor: "#111111",
+  },
+
+  redLine: {
+    flex: 1,
+    backgroundColor: "#D72638",
+  },
+
+  goldLine: {
+    flex: 1,
+    backgroundColor: "#F4B400",
+  },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 26,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
   },
 
   title: {
     fontSize: 30,
-    fontWeight: "bold",
+    fontWeight: "900",
+    color: "#111111",
+    marginBottom: 24,
     textAlign: "center",
-    marginBottom: 30,
   },
 
   input: {
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#cccccc",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 15,
-    fontSize: 16,
+    borderColor: "#CCCCCC",
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 17,
+    marginBottom: 18,
+    color: "#111111",
   },
 
-  button: {
-    backgroundColor: "#007bff",
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 5,
+  loginButton: {
+    backgroundColor: "#D72638",
+    padding: 18,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 6,
+  },
+
+  registerButton: {
+    backgroundColor: "#111111",
+    padding: 18,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 16,
   },
 
   buttonText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 17,
-  },
-
-  link: {
-    marginTop: 20,
-    textAlign: "center",
-    color: "#007bff",
-    fontSize: 15,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "800",
   },
 });

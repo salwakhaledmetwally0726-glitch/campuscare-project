@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
-
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   Alert,
 } from "react-native";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen({ navigation }) {
@@ -19,26 +18,19 @@ export default function ProfileScreen({ navigation }) {
 
       if (storedUser) {
         setUser(JSON.parse(storedUser));
+      } else {
+        Alert.alert("Session Expired", "Please login again.");
+        navigation.replace("Login");
       }
     } catch (error) {
-      Alert.alert("Error", "Could not load profile.");
+      Alert.alert("Error", "Failed to load profile.");
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
-
-      Alert.alert("Logged Out", "You have been logged out successfully.");
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Login" }],
-      });
-    } catch (error) {
-      Alert.alert("Error", "Could not logout.");
-    }
+  const logout = async () => {
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+    navigation.replace("Login");
   };
 
   useEffect(() => {
@@ -46,10 +38,24 @@ export default function ProfileScreen({ navigation }) {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.logoText}>
+          GIU <Text style={styles.redText}>Campus</Text>
+          <Text style={styles.goldText}>Care</Text>
+        </Text>
+        <Text style={styles.subtitle}>User Profile</Text>
+
+        <View style={styles.flagLine}>
+          <View style={styles.blackLine} />
+          <View style={styles.redLine} />
+          <View style={styles.goldLine} />
+        </View>
+      </View>
 
       <View style={styles.card}>
+        <Text style={styles.profileTitle}>Profile Information</Text>
+
         <Text style={styles.label}>Name</Text>
         <Text style={styles.value}>{user?.name || "N/A"}</Text>
 
@@ -57,84 +63,122 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.value}>{user?.email || "N/A"}</Text>
 
         <Text style={styles.label}>Role</Text>
-        <Text style={styles.value}>{user?.role || "N/A"}</Text>
+        <Text style={styles.roleValue}>{user?.role || "N/A"}</Text>
+
+        <TouchableOpacity
+          style={styles.blackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Back</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.redButton} onPress={logout}>
+          <Text style={styles.buttonText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>Back</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={{ height: 35 }} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 25,
-    justifyContent: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#F8F9FA",
+    padding: 18,
   },
-
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 30,
-  },
-
-  card: {
-    borderWidth: 1,
-    borderColor: "#dddddd",
-    borderRadius: 12,
-    padding: 20,
-    backgroundColor: "#f9f9f9",
-    marginBottom: 25,
-  },
-
-  label: {
-    fontSize: 15,
-    color: "#777777",
+  header: {
+    alignItems: "center",
     marginTop: 10,
+    marginBottom: 24,
   },
-
+  logoText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#111111",
+  },
+  redText: {
+    color: "#D72638",
+  },
+  goldText: {
+    color: "#F4B400",
+  },
+  subtitle: {
+    fontSize: 17,
+    color: "#555555",
+    marginTop: 6,
+  },
+  flagLine: {
+    flexDirection: "row",
+    width: 190,
+    height: 5,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginTop: 14,
+  },
+  blackLine: {
+    flex: 1,
+    backgroundColor: "#111111",
+  },
+  redLine: {
+    flex: 1,
+    backgroundColor: "#D72638",
+  },
+  goldLine: {
+    flex: 1,
+    backgroundColor: "#F4B400",
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 22,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+  },
+  profileTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#111111",
+    marginBottom: 22,
+    textAlign: "center",
+  },
+  label: {
+    fontSize: 16,
+    color: "#777777",
+    fontWeight: "800",
+    marginTop: 12,
+  },
   value: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#222222",
-    marginBottom: 10,
+    fontSize: 19,
+    color: "#111111",
+    fontWeight: "700",
+    marginTop: 4,
   },
-
-  backButton: {
-    backgroundColor: "#222222",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 12,
+  roleValue: {
+    fontSize: 19,
+    color: "#D72638",
+    fontWeight: "900",
+    marginTop: 4,
   },
-
-  backButtonText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 16,
+  blackButton: {
+    backgroundColor: "#111111",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 28,
   },
-
-  logoutButton: {
-    backgroundColor: "#dc3545",
-    padding: 15,
-    borderRadius: 10,
+  redButton: {
+    backgroundColor: "#D72638",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 12,
   },
-
-  logoutButtonText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 16,
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "800",
   },
 });

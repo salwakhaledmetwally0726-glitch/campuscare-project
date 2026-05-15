@@ -1,384 +1,366 @@
 import React, { useEffect, useState } from "react";
 import {
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Image,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../../api/api";
 
 export default function ManagerDashboard({ navigation }) {
   const [issues, setIssues] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [expandedIssueId, setExpandedIssueId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [expandedIssues, setExpandedIssues] = useState({});
 
-  const getToken = async () => {
-    const token = await AsyncStorage.getItem("token");
-
-    if (!token) {
-      Alert.alert("Session Expired", "Please login again.");
-      navigation.navigate("Login");
-      return null;
-    }
-
-    return token;
-  };
-
-  const refreshAll = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
 
-      const token = await getToken();
-      if (!token) return;
-
-      const issuesRes = await API.get("/issues", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const workersRes = await API.get("/issues/workers", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const issuesRes = await API.get("/issues");
       setIssues(issuesRes.data.issues || []);
+
+      const workersRes = await API.get("/issues/workers");
       setWorkers(workersRes.data.workers || []);
     } catch (error) {
-      Alert.alert("Error", "Failed to refresh issues and workers.");
+      Alert.alert("Error", error.response?.data?.error || "Failed to load data");
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleDetails = (issueId) => {
-    setExpandedIssues({
-      ...expandedIssues,
-      [issueId]: !expandedIssues[issueId],
-    });
-  };
-
   const updateStatus = async (issueId, status) => {
     try {
-      const token = await getToken();
-      if (!token) return;
-
-      await API.put(
-        `/issues/${issueId}/status`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      Alert.alert("Success", `Status updated to ${status}`);
-      refreshAll();
+      await API.put(`/issues/${issueId}/status`, { status });
+      Alert.alert("Success", `Issue updated to ${status}`);
+      loadData();
     } catch (error) {
       Alert.alert("Error", error.response?.data?.error || "Failed to update status");
     }
   };
 
-  const assignWorker = async (issueId, worker) => {
+  const assignWorker = async (issueId, workerId) => {
     try {
-      const token = await getToken();
-      if (!token) return;
+      await API.put(`/issues/${issueId}/assign`, {
+        worker_id: workerId,
+      });
 
-      await API.put(
-        `/issues/${issueId}/assign`,
-        { worker_id: worker.id },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      Alert.alert("Success", `Assigned to ${worker.name || worker.email}`);
-      refreshAll();
+      Alert.alert("Success", "Issue assigned to worker successfully");
+      loadData();
     } catch (error) {
       Alert.alert("Error", error.response?.data?.error || "Failed to assign worker");
     }
   };
 
-  const logout = async () => {
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("user");
-    navigation.navigate("Login");
-  };
-
   useEffect(() => {
-    refreshAll();
+    loadData();
   }, []);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Manager Dashboard</Text>
-      <Text style={styles.subtitle}>All Reported Issues</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.logoText}>
+          GIU <Text style={styles.redText}>Campus</Text>
+          <Text style={styles.goldText}>Care</Text>
+        </Text>
+        <Text style={styles.subtitle}>Facility Manager Dashboard</Text>
 
-      <TouchableOpacity style={styles.refreshBtn} onPress={refreshAll}>
-        <Text style={styles.btnText}>Refresh Issues & Workers</Text>
+        <View style={styles.flagLine}>
+          <View style={styles.blackLine} />
+          <View style={styles.redLine} />
+          <View style={styles.goldLine} />
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={styles.profileButton}
+        onPress={() => navigation.navigate("Profile")}
+      >
+        <Text style={styles.buttonText}>Profile</Text>
       </TouchableOpacity>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#0F172A" />
-      ) : issues.length === 0 ? (
-        <Text style={styles.emptyText}>No issues found.</Text>
-      ) : (
-        issues.map((issue) => (
-          <View key={issue.id} style={styles.card}>
-            <Text style={styles.issueTitle}>{issue.title}</Text>
-            <Text style={styles.text}>Category: {issue.category}</Text>
-            <Text style={styles.status}>Status: {issue.status || "Pending"}</Text>
+      <TouchableOpacity style={styles.redButton} onPress={loadData}>
+        <Text style={styles.buttonText}>
+          {loading ? "Refreshing..." : "Refresh Issues & Workers"}
+        </Text>
+      </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.detailsBtn}
-              onPress={() => toggleDetails(issue.id)}
-            >
-              <Text style={styles.btnText}>
-                {expandedIssues[issue.id] ? "Hide Full Details" : "View Full Details"}
+      {issues.map((issue) => (
+        <View key={issue.id} style={styles.card}>
+          <Text style={styles.issueTitle}>{issue.title}</Text>
+          <Text style={styles.text}>Category: {issue.category}</Text>
+          <Text style={styles.statusText}>Status: {issue.status}</Text>
+
+          {expandedIssueId === issue.id && (
+            <>
+              <Text style={styles.sectionTitle}>Issue Location</Text>
+              <Text style={styles.text}>Building: {issue.building}</Text>
+              <Text style={styles.text}>Floor: {issue.floor}</Text>
+              <Text style={styles.text}>Room: {issue.room}</Text>
+
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.text}>{issue.description}</Text>
+
+              <Text style={styles.sectionTitle}>Issue Photo</Text>
+              {issue.photo_url ? (
+                <Image source={{ uri: issue.photo_url }} style={styles.issueImage} />
+              ) : (
+                <Text style={styles.noPhotoText}>No issue photo uploaded</Text>
+              )}
+
+              <Text style={styles.sectionTitle}>Completion Photo</Text>
+              {issue.completion_photo_url ? (
+                <Image
+                  source={{ uri: issue.completion_photo_url }}
+                  style={styles.issueImage}
+                />
+              ) : (
+                <Text style={styles.noPhotoText}>No completion photo yet</Text>
+              )}
+
+              <Text style={styles.text}>
+                Worker Comment: {issue.worker_comment || "No comment yet"}
               </Text>
-            </TouchableOpacity>
+            </>
+          )}
 
-            {expandedIssues[issue.id] && (
-              <View style={styles.detailsBox}>
-                <Text style={styles.detailsTitle}>Issue Full Details</Text>
-
-                <Text style={styles.detailText}>Issue ID: {issue.id}</Text>
-                <Text style={styles.detailText}>Title: {issue.title}</Text>
-                <Text style={styles.detailText}>Category: {issue.category}</Text>
-                <Text style={styles.detailText}>Description: {issue.description}</Text>
-                <Text style={styles.detailText}>Building: {issue.building}</Text>
-                <Text style={styles.detailText}>Floor: {issue.floor}</Text>
-                <Text style={styles.detailText}>Room: {issue.room}</Text>
-                <Text style={styles.detailText}>Status: {issue.status}</Text>
-                <Text style={styles.detailText}>Created By: {issue.created_by}</Text>
-                <Text style={styles.detailText}>
-                  Assigned To: {issue.assigned_to || "Not assigned"}
-                </Text>
-                <Text style={styles.detailText}>
-                  Worker Comment: {issue.worker_comment || "No comment yet"}
-                </Text>
-                <Text style={styles.detailText}>
-                  Created At: {issue.created_at || "N/A"}
-                </Text>
-
-                {issue.photo_url ? (
-                  <>
-                    <Text style={styles.imageLabel}>Issue Photo:</Text>
-                    <Image source={{ uri: issue.photo_url }} style={styles.issueImage} />
-                  </>
-                ) : (
-                  <Text style={styles.noImage}>No issue photo available</Text>
-                )}
-
-                {issue.completion_photo_url ? (
-                  <>
-                    <Text style={styles.imageLabel}>Completion Photo:</Text>
-                    <Image
-                      source={{ uri: issue.completion_photo_url }}
-                      style={styles.issueImage}
-                    />
-                  </>
-                ) : (
-                  <Text style={styles.noImage}>No completion photo yet</Text>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.section}>Update Status</Text>
-
-            <TouchableOpacity
-              style={[styles.statusBtn, styles.blue]}
-              onPress={() => updateStatus(issue.id, "In Progress")}
-            >
-              <Text style={styles.btnText}>In Progress</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.statusBtn, styles.green]}
-              onPress={() => updateStatus(issue.id, "Resolved")}
-            >
-              <Text style={styles.btnText}>Resolved</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.statusBtn, styles.red]}
-              onPress={() => updateStatus(issue.id, "Closed")}
-            >
-              <Text style={styles.btnText}>Closed</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.section}>Assign to Worker</Text>
-
-            {workers.length === 0 ? (
-              <Text style={styles.noWorker}>No workers found</Text>
-            ) : (
-              workers.map((worker) => (
-                <TouchableOpacity
-                  key={worker.id}
-                  style={styles.workerBtn}
-                  onPress={() => assignWorker(issue.id, worker)}
-                >
-                  <Text style={styles.workerText}>
-                    {worker.name || "Worker"} - {worker.email}
-                  </Text>
-                </TouchableOpacity>
-              ))
-            )}
-
-            <Text style={styles.assigned}>
-              Assigned: {issue.assigned_to ? issue.assigned_to : "Not assigned"}
+          <TouchableOpacity
+            style={styles.blackButton}
+            onPress={() =>
+              setExpandedIssueId(expandedIssueId === issue.id ? null : issue.id)
+            }
+          >
+            <Text style={styles.buttonText}>
+              {expandedIssueId === issue.id ? "Hide Details" : "View Full Details"}
             </Text>
-          </View>
-        ))
-      )}
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.btnText}>Logout</Text>
+          <Text style={styles.sectionTitle}>Update Status</Text>
+
+          <TouchableOpacity
+            style={styles.goldButton}
+            onPress={() => updateStatus(issue.id, "In Progress")}
+          >
+            <Text style={styles.buttonText}>In Progress</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.greenButton}
+            onPress={() => updateStatus(issue.id, "Resolved")}
+          >
+            <Text style={styles.buttonText}>Resolved</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.redButton}
+            onPress={() => updateStatus(issue.id, "Closed")}
+          >
+            <Text style={styles.buttonText}>Closed</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.sectionTitle}>Assign to Worker</Text>
+
+          {workers.length === 0 ? (
+            <Text style={styles.errorText}>No workers found.</Text>
+          ) : (
+            workers.map((worker) => (
+              <TouchableOpacity
+                key={worker.id}
+                style={styles.assignButton}
+                onPress={() => assignWorker(issue.id, worker.id)}
+              >
+                <Text style={styles.buttonText}>
+                  {worker.name} - {worker.email}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+
+          {issue.assigned_to ? (
+            <Text style={styles.assignedText}>Assigned: {issue.assigned_to}</Text>
+          ) : (
+            <Text style={styles.notAssignedText}>Not assigned yet</Text>
+          )}
+        </View>
+      ))}
+
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={() => navigation.replace("Login")}
+      >
+        <Text style={styles.buttonText}>Logout</Text>
       </TouchableOpacity>
+
+      <View style={{ height: 35 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 22, backgroundColor: "#F8FAFC" },
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginTop: 20,
-    color: "#0F172A",
+  container: {
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+    padding: 18,
+  },
+  header: {
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 22,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#111111",
+  },
+  redText: {
+    color: "#D72638",
+  },
+  goldText: {
+    color: "#F4B400",
   },
   subtitle: {
-    fontSize: 18,
-    textAlign: "center",
-    color: "#64748B",
-    marginBottom: 15,
+    fontSize: 17,
+    color: "#555555",
+    marginTop: 6,
   },
-  refreshBtn: {
-    backgroundColor: "#0F172A",
-    padding: 14,
+  flagLine: {
+    flexDirection: "row",
+    width: 190,
+    height: 5,
     borderRadius: 10,
-    marginBottom: 18,
+    overflow: "hidden",
+    marginTop: 14,
   },
-  emptyText: {
-    textAlign: "center",
-    fontSize: 18,
-    color: "#64748B",
-    marginTop: 30,
+  blackLine: {
+    flex: 1,
+    backgroundColor: "#111111",
+  },
+  redLine: {
+    flex: 1,
+    backgroundColor: "#D72638",
+  },
+  goldLine: {
+    flex: 1,
+    backgroundColor: "#F4B400",
   },
   card: {
     backgroundColor: "#FFFFFF",
-    padding: 18,
-    borderRadius: 14,
-    marginBottom: 18,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 22,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E5E5E5",
   },
   issueTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 25,
+    fontWeight: "900",
+    color: "#111111",
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#111111",
+    marginTop: 16,
     marginBottom: 8,
-    color: "#0F172A",
   },
   text: {
     fontSize: 16,
-    color: "#334155",
-    marginBottom: 4,
+    color: "#444444",
+    marginBottom: 5,
   },
-  status: {
-    fontSize: 18,
-    color: "#1D4ED8",
-    fontWeight: "bold",
-    marginVertical: 10,
-  },
-  section: {
-    fontSize: 17,
-    fontWeight: "bold",
-    marginTop: 12,
-    marginBottom: 8,
-    color: "#0F172A",
-  },
-  statusBtn: {
-    padding: 13,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  blue: { backgroundColor: "#2563EB" },
-  green: { backgroundColor: "#059669" },
-  red: { backgroundColor: "#DC2626" },
-  workerBtn: {
-    backgroundColor: "#334155",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 7,
-  },
-  workerText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 13,
-  },
-  assigned: {
-    color: "#047857",
-    fontWeight: "bold",
-    marginTop: 8,
-    fontSize: 13,
-  },
-  noWorker: {
-    color: "#DC2626",
-    marginBottom: 8,
-  },
-  logoutBtn: {
-    backgroundColor: "#020617",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 30,
-  },
-  btnText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  detailsBtn: {
-    backgroundColor: "#475569",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  detailsBox: {
-    backgroundColor: "#F1F5F9",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    marginBottom: 10,
-  },
-  detailsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#0F172A",
-  },
-  detailText: {
-    fontSize: 14,
-    color: "#334155",
-    marginBottom: 4,
-  },
-  imageLabel: {
-    fontSize: 15,
-    fontWeight: "bold",
-    marginTop: 10,
-    marginBottom: 6,
-    color: "#0F172A",
+  statusText: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#D72638",
+    marginVertical: 14,
   },
   issueImage: {
     width: "100%",
-    height: 170,
-    borderRadius: 10,
+    height: 190,
+    borderRadius: 14,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  noPhotoText: {
+    color: "#777777",
+    fontSize: 15,
+    fontStyle: "italic",
     marginBottom: 8,
   },
-  noImage: {
-    color: "#64748B",
+  profileButton: {
+    backgroundColor: "#F4B400",
+    padding: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  blackButton: {
+    backgroundColor: "#111111",
+    padding: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  redButton: {
+    backgroundColor: "#D72638",
+    padding: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  goldButton: {
+    backgroundColor: "#F4B400",
+    padding: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  greenButton: {
+    backgroundColor: "#2EAD4B",
+    padding: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  assignButton: {
+    backgroundColor: "#111111",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  logoutButton: {
+    backgroundColor: "#111111",
+    padding: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  assignedText: {
+    color: "#2EAD4B",
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 14,
+  },
+  notAssignedText: {
+    color: "#777777",
+    fontSize: 16,
     fontStyle: "italic",
+    marginTop: 14,
+  },
+  errorText: {
+    color: "#D72638",
+    fontSize: 16,
     marginTop: 8,
   },
 });

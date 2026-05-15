@@ -1,66 +1,48 @@
 import React, { useState } from "react";
 import {
-  ScrollView,
+  View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
+  ScrollView,
   Image,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../../api/api";
 
 export default function SubmitIssueScreen({ navigation }) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [building, setBuilding] = useState("");
   const [floor, setFloor] = useState("");
   const [room, setRoom] = useState("");
-  const [description, setDescription] = useState("");
-  const [imageUri, setImageUri] = useState(null);
+  const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permission.status !== "granted") {
-      Alert.alert("Permission Required", "Please allow photo access.");
-      return;
-    }
-
+  const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
+      quality: 0.8,
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      setPhoto(result.assets[0]);
     }
   };
 
-  const handleSubmitIssue = async () => {
-    if (!title || !category || !building || !floor || !room || !description) {
-      Alert.alert("Missing Data", "Please fill all issue fields.");
+  const submitIssue = async () => {
+    if (!title || !description || !category || !building || !floor || !room) {
+      Alert.alert("Missing Fields", "Please fill in all required fields.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const token = await AsyncStorage.getItem("token");
-
-      if (!token) {
-        Alert.alert("Not Logged In", "Please login again.");
-        navigation.navigate("Login");
-        return;
-      }
-
       const formData = new FormData();
-
       formData.append("title", title);
       formData.append("description", description);
       formData.append("category", category);
@@ -68,40 +50,26 @@ export default function SubmitIssueScreen({ navigation }) {
       formData.append("floor", floor);
       formData.append("room", room);
 
-      if (imageUri) {
+      if (photo) {
         formData.append("photo", {
-          uri: imageUri,
-          name: `issue-${Date.now()}.jpg`,
+          uri: photo.uri,
+          name: "issue-photo.jpg",
           type: "image/jpeg",
         });
       }
 
-      const response = await API.post("/issues", formData, {
+      await API.post("/issues", formData, {
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
 
-      Alert.alert(
-        "Success",
-        response.data.message || "Issue submitted successfully"
-      );
-
-      setTitle("");
-      setCategory("");
-      setBuilding("");
-      setFloor("");
-      setRoom("");
-      setDescription("");
-      setImageUri(null);
-
+      Alert.alert("Success", "Issue submitted successfully.");
       navigation.navigate("MyIssues");
     } catch (error) {
-      console.log("Submit issue error:", error.response?.data || error.message);
       Alert.alert(
-        "Submit Failed",
-        error.response?.data?.error || "Could not submit issue."
+        "Error",
+        error.response?.data?.error || "Failed to submit issue"
       );
     } finally {
       setLoading(false);
@@ -109,113 +77,220 @@ export default function SubmitIssueScreen({ navigation }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Report New Issue</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.logoText}>
+          GIU <Text style={styles.redText}>Campus</Text>
+          <Text style={styles.goldText}>Care</Text>
+        </Text>
+        <Text style={styles.subtitle}>Submit New Issue</Text>
 
-      <TextInput style={styles.input} placeholder="Title" value={title} onChangeText={setTitle} />
-      <TextInput style={styles.input} placeholder="Category" value={category} onChangeText={setCategory} />
-      <TextInput style={styles.input} placeholder="Building" value={building} onChangeText={setBuilding} />
-      <TextInput style={styles.input} placeholder="Floor" value={floor} onChangeText={setFloor} />
-      <TextInput style={styles.input} placeholder="Room" value={room} onChangeText={setRoom} />
+        <View style={styles.flagLine}>
+          <View style={styles.blackLine} />
+          <View style={styles.redLine} />
+          <View style={styles.goldLine} />
+        </View>
+      </View>
 
-      <TextInput
-        style={styles.textArea}
-        placeholder="Description"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-      />
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Issue Information</Text>
 
-      <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-        <Text style={styles.imageButtonText}>Choose Issue Photo</Text>
-      </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Issue title"
+          placeholderTextColor="#999999"
+          value={title}
+          onChangeText={setTitle}
+        />
 
-      {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.previewImage} />
-      ) : (
-        <Text style={styles.noImageText}>No image selected</Text>
-      )}
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Issue description"
+          placeholderTextColor="#999999"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmitIssue} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Submit Issue</Text>}
-      </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Category e.g. Furniture, Technical, Cleaning"
+          placeholderTextColor="#999999"
+          value={category}
+          onChangeText={setCategory}
+        />
 
-      <TouchableOpacity onPress={() => navigation.navigate("CommunityDashboard")}>
-        <Text style={styles.back}>Back to Dashboard</Text>
-      </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Location</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Building"
+          placeholderTextColor="#999999"
+          value={building}
+          onChangeText={setBuilding}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Floor"
+          placeholderTextColor="#999999"
+          value={floor}
+          onChangeText={setFloor}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Room"
+          placeholderTextColor="#999999"
+          value={room}
+          onChangeText={setRoom}
+        />
+
+        <Text style={styles.sectionTitle}>Issue Photo</Text>
+
+        {photo ? (
+          <Image source={{ uri: photo.uri }} style={styles.previewImage} />
+        ) : (
+          <Text style={styles.photoText}>No issue photo selected</Text>
+        )}
+
+        <TouchableOpacity style={styles.goldButton} onPress={pickPhoto}>
+          <Text style={styles.buttonText}>Choose Issue Photo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.redButton}
+          onPress={submitIssue}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Submitting..." : "Submit Issue"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.blackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Back</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    padding: 25,
-    justifyContent: "center",
-    backgroundColor: "#ffffff",
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+    padding: 18,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 25,
+  header: {
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 24,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#111111",
+  },
+  redText: {
+    color: "#D72638",
+  },
+  goldText: {
+    color: "#F4B400",
+  },
+  subtitle: {
+    fontSize: 17,
+    color: "#555555",
+    marginTop: 6,
+  },
+  flagLine: {
+    flexDirection: "row",
+    width: 190,
+    height: 5,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginTop: 14,
+  },
+  blackLine: {
+    flex: 1,
+    backgroundColor: "#111111",
+  },
+  redLine: {
+    flex: 1,
+    backgroundColor: "#D72638",
+  },
+  goldLine: {
+    flex: 1,
+    backgroundColor: "#F4B400",
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 35,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#111111",
+    marginBottom: 12,
+    marginTop: 8,
   },
   input: {
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#cccccc",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
+    borderColor: "#CCCCCC",
+    borderRadius: 13,
+    padding: 15,
     fontSize: 16,
+    marginBottom: 14,
+    color: "#111111",
   },
   textArea: {
-    borderWidth: 1,
-    borderColor: "#cccccc",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
-    fontSize: 16,
-    height: 110,
+    height: 100,
     textAlignVertical: "top",
-  },
-  imageButton: {
-    backgroundColor: "#222222",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  imageButtonText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontWeight: "bold",
   },
   previewImage: {
     width: "100%",
-    height: 180,
-    borderRadius: 10,
-    marginBottom: 15,
+    height: 190,
+    borderRadius: 14,
+    marginBottom: 12,
   },
-  noImageText: {
-    textAlign: "center",
-    color: "#777777",
-    marginBottom: 15,
+  photoText: {
+    color: "#666666",
+    fontSize: 15,
+    fontStyle: "italic",
+    marginBottom: 12,
   },
-  button: {
-    backgroundColor: "#007bff",
-    padding: 15,
-    borderRadius: 10,
+  blackButton: {
+    backgroundColor: "#111111",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  redButton: {
+    backgroundColor: "#D72638",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  goldButton: {
+    backgroundColor: "#F4B400",
+    padding: 16,
+    borderRadius: 13,
+    alignItems: "center",
     marginTop: 8,
   },
   buttonText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontWeight: "bold",
+    color: "#FFFFFF",
     fontSize: 17,
-  },
-  back: {
-    marginTop: 20,
-    textAlign: "center",
-    color: "#007bff",
-    fontSize: 16,
+    fontWeight: "800",
   },
 });
